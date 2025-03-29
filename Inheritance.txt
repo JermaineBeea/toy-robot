@@ -1,0 +1,458 @@
+Inheritance
+The refactoring that introduced Position improved the design, but the code around how commands are handled has a bit of a "smell". Just think of the changes that would be needed to when another command (e.g. turn left or turn right) is added to our robot.
+
+A good design is one that minimise the extent of changes needed to introduce new functionality. We have seen how composition helps achieve this. Now we introduce a concept called inheritance as another way to help improve our design.
+
+You have already encountered inheritance when coding the equals() and toString() methods of some objects. Those two methods are defined on another class built into Java called Object. Every class in Java automatically inherits from Object.
+
+We sometimes talk of a base class (containing the common data and functionality) and sub classes (which extend it with specialized functionality and/or data) or of a parent class and child classes. We say that Object is the base class, or the parent class, and Position is the sub-class, or child class, respectively.
+
+In this section, we will use inheritance to make our design more extensible with less cost for introducing changes.
+
+In our Toy Robot example it will be ideal to implement our handling of commands by actually encapsulating the various commands as classes that inherit from a common Command base class.
+
+Introduce command objects
+The help command
+The easiest command is help. Let’s introduce a new class for the help command.
+
+CommandTest.java
+    @Test
+    void getHelpName() {
+        HelpCommand test = new HelpCommand();                                                               
+        assertEquals("help", test.getName());
+    }
+HelpCommand.java
+public class HelpCommand {
+    public String getName() {
+        return null;
+    }
+}
+Run the test. It should fail. (Good!) Now change the implementation of getName() to return the name of the command.
+
+HelpCommand.java
+public class HelpCommand {
+    public String getName() {
+        return "help";
+    }
+}
+Now run the tests and they should pass.
+
+It’s time to get the robot to use the command class. Again, we do this small, safe steps.
+
+RobotTest.java
+public class RobotTest {
+    //...snip...
+    @Test
+    void help() {
+        Robot robot = new Robot("CrashTestDummy");
+        HelpCommand command = new HelpCommand();
+        assertTrue(robot.handleCommand(command.getName()));                                             
+        assertEquals("I can understand these commands:\n" +
+                "OFF  - Shut down robot\n" +
+                "HELP - provide information about commands\n" +
+                "FORWARD - move forward by specified number of steps, e.g. 'FORWARD 10'", robot.getStatus());
+    }
+}
+We ask the HelpCommand for its name and give that to the Robot object.
+Run the tests and they should pass.
+
+The shutdown command
+Let’s introduce a new class for the shutdown command.
+
+CommandTest.java
+    @Test
+    void getShutdownName() {
+        ShutdownCommand test = new ShutdownCommand();
+        assertEquals("off", test.getName());
+    }
+ShutdownCommand.java
+public class ShutdownCommand {
+    public String getName() {
+        return null;
+    }
+}
+Run the tests and it should fail, then change the implementation to return the name of the command.
+
+ShutdownCommand.java
+public class ShutdownCommand {
+    public String getName() {
+        return "off";
+    }
+}
+Now run the tests and they should pass.
+
+Update the robot tests.
+
+RobotTest.java
+public class RobotTest {
+    //...snip...
+    @Test
+    void shutdown() {
+        Robot robot = new Robot("CrashTestDummy");
+        ShutdownCommand command = new ShutdownCommand();
+        assertTrue(robot.handleCommand(command.getName()));
+    }
+}
+Run the tests and they should pass.
+
+The forward command
+CommandTest.java
+    @Test
+    void getForwardName() {
+        ForwardCommand test = new ForwardCommand();
+        assertEquals("forward", test.getName());
+    }
+ForwardCommand.java
+public class ForwardCommand {
+    public String getName() {
+        return null;
+    }
+}
+Run the tests and it should fail, then change the implementation to return the name of the command.
+
+ForwardCommand.java
+public class ForwardCommand {
+    public String getName() {
+        return "forward";
+    }
+}
+Now run the tests and they should pass.
+
+Update the robot tests.
+
+RobotTest.java
+public class RobotTest {
+    //...snip...
+    @Test
+    void forward() {
+        Robot robot = new Robot("CrashTestDummy");
+        ForwardCommand command = new ForwardCommand();
+        assertTrue(robot.handleCommand(command.getName() + " 10"));                                     
+        Position expectedPosition = new Position(Robot.CENTRE.getX(), Robot.CENTRE.getY() + 10);
+        assertEquals(expectedPosition, robot.getPosition());
+        assertEquals("Moved forward by 10 steps.", robot.getStatus());
+    }
+}
+The robot also needs the number of steps for the forward command.
+Don’t repeat yourself
+In the code we just wrote, every command has the same behaviour: it is able to return its name.
+
+The forward command, however, is slightly different in that it knows its name and also needs the number of steps it must move. So, it appears that there is quite a bit of repetition amongst the different command objects.
+
+Don’t Repeat Yourself - DRY
+Repetition is a problematic issue and is one of the leading causes for defects. It’s easy to make a change in one place and then forget to make the same changes in the repeated code. It’s so common that, over the years, a programming principle emerged known as DRY - Don’t Repeat Yourself.
+
+Read more on DRY here.
+
+Introduce the Command class
+Let’s consolidate the code so that we don’t repeat ourselves. We are going to use inheritance to eliminate the repetition.
+
+Inheritance is not the only way to eliminate repeating code. Composition, common methods, etc are equally effective ways to reduce duplication.
+
+Which should you use? It depends on the problem being solved. So, choose wisely, try it out with a few tests and if it seems to be working, continue with your approach.
+
+Remember, pay attention to your code. Good code is simple to read and easy to change.
+
+Since all the commands are …​ well, just commands …​ let’s introduce a class called Command that knows its name.
+
+Let’s start with a test, as we normally do.
+
+CommandTest.java
+    @Test
+    void getName() {
+        Command test = new Command("test");                                                             
+        assertEquals("test", test.getName());
+    }
+We create any old command that has the name test.
+Now create the Command class, so that we can run the test.
+
+Command.java
+public class Command {
+    public Command(String name) {
+    }
+    public String getName() {
+        return null;
+    }
+}
+Run the test, and it should fail because we have not yet implemented the correct behaviour
+
+Now implement the code so that the tests pass.
+
+Command.java
+public class Command {
+    private final String name;
+
+    public Command(String name){                                                                        
+        this.name = name;
+    }
+
+    public String getName() {                                                                           
+        return name;
+    }
+}
+The constructor takes the name as parameter, and sets the name field.
+Return the name of the command.
+Help inherits from Command
+Now that we have Command that knows how to tell its name, and HelpCommand also tells its name; let’s change HelpCommand inherit the behaviour of Command. If we make HelpCommand a kind of Command object, then our test will change to the following:
+
+CommandTest.java
+    @Test
+    void getHelpName() {
+        HelpCommand test = new HelpCommand();                                                               
+        assertEquals("help", test.getName());
+    }
+Since a HelpCommand is a Command, the variable test is of type Command. In this way, we can treat HelpCommand objects just like any command object.
+Furthermore, the HelpCommand object should inherit from or extend the Command class.
+
+HelpCommand.java
+public class HelpCommand extends Command {                                                              
+    public HelpCommand() {
+        super("help");                                                                                  
+    }
+}
+Here we specify that HelpCommand must extend the Command class.
+We use super here which says that this object must call the super class' constructor which needs a name.
+Run the tests and it should pass.
+
+Now update the robot tests to use Command objects.
+
+RobotTest.java
+public class RobotTest {
+    //...snip...
+    @Test
+    void help() {
+        Robot robot = new Robot("CrashTestDummy");
+        Command command = new HelpCommand();
+        assertTrue(robot.handleCommand(command.getName()));
+        assertEquals("I can understand these commands:\n" +
+                "OFF  - Shut down robot\n" +
+                "HELP - provide information about commands\n" +
+                "FORWARD - move forward by specified number of steps, e.g. 'FORWARD 10'", robot.getStatus());
+    }
+    //...snip...
+}
+Code it yourself
+Now, that you have programmed one inherited class, change ShutdownCommand and ForwardCommand to also inherit from Command.
+
+Do this test first using TDD and ensure that all tests pass before continuing.
+
+Commands that take arguments
+Even though ForwardCommand is a Command, it is slightly different from the other commands because it takes an argument for the number of steps to move.
+
+We’re going to change the base class Command so that it can also be constructed with an argument.
+
+CommandTest.java
+    @Test
+    void getNameAndArgment() {
+        Command test = new Command("test", "100");
+        assertEquals("test", test.getName());
+        assertEquals("100", test.getArgument());
+    }
+Now add the required code to Command and run the tests. We expect the test to fail.
+
+Command.java
+public class Command {
+    //...snip...
+    public Command(String name, String argument) {
+        this.name = name;
+    }
+    //...snip...
+    public String getArgument() {
+        return null;
+    }
+}
+Now let’s implement the code to make it pass.
+
+Command.java
+public class Command {
+    //...snip...
+    public Command(String name, String argument) {
+        this(name);
+        this.argument = argument.trim();
+    }
+    public String getArgument() {
+        return this.argument;
+    }
+    //...snip...
+}
+Run the tests and it should pass.
+
+Forward takes an argument
+Now that we have commands that can take an argument, let’s change the forward command to take an argument.
+
+CommandTest.java
+    @Test
+    void getForwardName() {
+        ForwardCommand test = new ForwardCommand("100");
+        assertEquals("forward", test.getName());
+        assertEquals("100", test.getArgument());
+    }
+Then change the code in the ForwardClass.
+
+ForwardCommand.java
+public class ForwardCommand extends Command {
+    public ForwardCommand() {                                                                           
+        super("forward");
+    }
+
+    public ForwardCommand(String argument) {                                                            
+        super("forward", argument);
+    }
+}
+This was the original constructor. We are leaving it in place so that we don’t break the RobotTest tests.
+This is the new constructor which uses the argument.
+Run the tests and it should pass.
+
+Notice how we did not make the test fail because the code to make the test pass was already in place in the base class Command. You will find that as you create good designs, there are times when simply writing a new test will pass because it happens to be simple extension without any new behaviour.
+
+Wiring commands into Robot
+It’s time refactor Robot to use commands instead of strings.
+
+Let’s tackle the shutdown test.
+
+RobotTest.java
+public class RobotTest {
+    //...snip...
+    @Test
+    void forward() {
+        Robot robot = new Robot("CrashTestDummy");
+        ForwardCommand command = new ForwardCommand("10");                                              
+        assertTrue(robot.handleCommand(command));                                                       
+        Position expectedPosition = new Position(Robot.CENTRE.getX(), Robot.CENTRE.getY() + 10);
+        assertEquals(expectedPosition, robot.getPosition());
+        assertEquals("Moved forward by 10 steps.", robot.getStatus());
+    }
+    //...snip...
+}
+We create a forward command with an argument
+We give the command object to Robot, not the name of the command.
+To make the test run, we must update Robot. Add a new method that is also called handleCommand() that takes a command object. This will result in temporary duplication which we will DRY up later. We do this so that we don’t break any of the other tests that are using the existing handleCommand() method.
+
+Robot.java
+public class Robot {
+    //...snip...
+    public boolean handleCommand(Command command) {
+        return false;
+    }
+    //...snip...
+}
+Run the tests and they should fail.
+
+Now implement the following code for Robot.
+
+Robot.java
+public class Robot {
+    //...snip...
+    public boolean handleCommand(Command command) {
+        String commandName = command.getName();
+
+        switch (commandName){
+            case "off":
+                this.status = "Shutting down";
+                break;
+            case "help":
+                this.status = doHelp();
+                break;
+            case "forward":
+                String argument = command.getArgument();                                                
+                this.status = doForward(Integer.parseInt(argument));
+                break;
+            default:
+                this.status = "I am not programmed for: " + command.getName();
+        }
+        return true;
+    }
+    //...snip...
+}
+We simply ask the command for the argument.
+Run the tests and it should pass.
+
+Code it yourself
+Now, go ahead complete the following on your own:
+
+Update the tests in RobotTest to use the method public boolean handleCommand(Command command). Do this one test at a time and make sure that your tests pass before continuing.
+
+Move the code that converts the name of the command and trims it to the constructor of the Command class. Write an appropriate test to ensure that the name is converted to lower case and trimmed.
+
+Parsing command strings
+It is not unreasonable for a command to be constructed from a single string such as forward 100. Given such a string, we should be able to construct a ForwardCommand("100") object.
+
+Let’s program this functionality into the Command class.
+
+You should program each part of the test one at a time, gradually introducing each new assertion. Alternatively, you can program each command to be created as a separate test. It’s shown in its entirety here for convenience only.
+
+Don’t give up on small, safe steps!
+
+CommandTest.java
+public class CommandTest {
+    //...snip...
+    @Test
+    void createCommand() {
+        Command forward = Command.create("forward 10");                                                 
+        assertEquals("forward", forward.getName());
+        assertEquals("10", forward.getArgument());
+
+        Command shutdown = Command.create("shutdown");                                                  
+        assertEquals("off", shutdown.getName());
+
+        Command help = Command.create("help");                                                          
+        assertEquals("help", help.getName());
+    }
+
+    @Test
+    void createInvalidCommand() {
+        try {
+            Command forward = Command.create("say hello");                                              
+            fail("Should have thrown an exception");                                                    
+        } catch (IllegalArgumentException e) {
+            assertEquals("Unsupported command: say hello", e.getMessage());                             
+        }
+    }
+}
+Create forward command
+Create shutdown command
+Create help command
+Try to create an unsupported command
+Fail the test if it miraculously works
+Pass the test if the exception was thrown with the correct message
+Command.java
+public class Command {
+    //...snip...
+    public static Command create(String instruction) {
+        return null;
+    }
+}
+Run the tests and it should fail.
+
+Now implement the code to create commands.
+
+Command.java
+public class Command {
+    //...snip...
+    public static Command create(String instruction) {
+        String[] args = instruction.toLowerCase().trim().split(" ");
+        switch (args[0]){
+            case "shutdown":
+                return new ShutdownCommand();
+            case "help":
+                return new HelpCommand();
+            case "forward":
+                return new ForwardCommand(args[1]);
+            default:
+                throw new IllegalArgumentException("Unsupported command: " + instruction);
+        }
+    }
+}
+Code it yourself
+Now that we have a way of creating valid commands, we need to clean up the Robot class which also contains similar logic.
+
+Remove the method isValidCommand on Robot. Don’t forget to clean up the tests too.
+
+Reflection
+We created a model for representing our robot’s commands by using inheritance.
+
+This also makes it relatively easy to add support for new commands.
+
+If you are confused about any of the code we’ve worked through, take a moment and discuss it with a colleague. Make sure you understand inheritance and composition before continuing to the next section.
+
+After inheritance, this is what our domain model looks like.

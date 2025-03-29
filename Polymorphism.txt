@@ -1,0 +1,144 @@
+Polymorphism
+By using inheritance and composition we were able to create a better software design. However, in Robot we are still using conditional logic to determine how the robot must react to a command (the switch statement that uses the name of the command). Now imagine we had various places in our code where we needed the robot to behave differently depending on the command given to it.
+
+This is where the polymorphism is an important feature of OOP. It comes from the Greek πολύ (= many) and μορφή (= to form or shape). It basically means that many forms (i.e. sub-classes) has the same form or shape (i.e. similar interface). For example, Command base class and its sub-classes has the same public methods (i.e. getName() and getArgument()).
+
+This enables two valuable design properties:
+
+Substitutability - we can exchange an instance of any of the Command classes for any other one, and the client code (i.e. Robot) will be able to use it, since it has the same interface.
+
+Extensibility - we can extend the hierarchy of sub-classes, e.g. add a BackCommand or TurnCommand without affecting the client code.
+
+Let us use polymorphism to improve our code even more.
+
+Commands are executed on a Robot
+We’re going to take a slightly different approach in this section. Instead of making changes in the tests first, we are going to make changes in the code and see which tests break.
+
+This is being introduced simply to show you how your tests can still guide you to a good design.
+
+Of course, when introducing brand new functionality, it is better to start with the test.
+
+Our Robot class has lots of code that does the actual execution of various commands. We can move this logic to the specific command sub-classes.
+
+Add an execute(Robot target) method to the Command class.
+
+Make this an abstract method, so that the base class only defines the signature, but no implementation.
+
+You will get an error on all the sub-classes where you will need to implement this method.
+
+Command.java
+public abstract class Command {                                                                         
+    //...snip...
+    public abstract boolean execute(Robot target);                                                      
+}
+We need to add the abstract keyword to Command in order to define abstract methods in it. Abstract classes cannot be instantiated, and typically indicates in your design that it is the base class of a hierarchy of sub-classes, and not meant to be used directly (as is the case with our example).
+Here we declare the signature of the execute method that the various sub-classes must implement.
+You will need to update CommandTest.java to get rid of the tests that instantiated Command directly, since those are not valid anymore.
+
+Forward command
+Now we need to implement the execute method in ForwardCommand, by moving the code from Robot. Remember that the Robot has the responsibility of knowing and updating its position — the command can only instruct it to change it.
+
+We will need to update the public interface of Robot to allow some positional updates.
+
+ForwardCommand.java
+public class ForwardCommand extends Command {
+    @Override
+    public boolean execute(Robot target) {
+        int nrSteps = Integer.parseInt(getArgument());
+        if (target.updatePosition(nrSteps)){
+            target.setStatus("Moved forward by "+nrSteps+" steps.");
+        } else {
+            target.setStatus("Sorry, I cannot go outside my safe zone.");
+        }
+        return true;
+    }
+
+    public ForwardCommand(String argument) {
+        super("forward", argument);
+    }
+}
+Notice how we are copying code out of Robot into Command objects. This means that we are altering our design to give Commands the responsibility to actually command the robot.
+
+Yes, this is creating code duplication, but it is temporary. Sometimes we have to make our code worse to make it better - because we prefer to work in small safe steps.
+
+Code it yourself
+In Robot we had to make updatePosition public in order to allow the Command to update the state of the Robot. This also requires you to write the method setStatus() on Robot. We leave this to you to complete before continuing.
+
+Make the robot move forward by using the command
+CommandTest.java
+    @Test
+    void executeForward() {
+        Robot robot = new Robot("CrashTestDummy");
+        Command forward100 = Command.create("forward 10");
+        assertTrue(forward100.execute(robot));
+        Position expectedPosition = new Position(Robot.CENTRE.getX(), Robot.CENTRE.getY() + 10);
+        assertEquals(expectedPosition, robot.getPosition());
+        assertEquals("Moved forward by 10 steps.", robot.getStatus());
+    }
+The above code should be easy enough to understand.
+
+Help command
+Update CommandTest to include a test for testing the HelpCommand.execute method.
+
+Now implement execute method for HelpCommand.
+
+HelpCommand.java
+public class HelpCommand extends Command {                                                              
+
+    public HelpCommand() {
+        super("help");                                                                                  
+    }
+
+    @Override
+    public boolean execute(Robot target) {
+        target.setStatus("I can understand these commands:\n" +
+                "OFF  - Shut down robot\n" +
+                "HELP - provide information about commands\n" +
+                "FORWARD - move forward by specified number of steps, e.g. 'FORWARD 10'");
+        return true;
+    }
+}
+Test the help command
+CommandTest.java
+    @Test
+    void executeHelp() {
+        Robot robot = new Robot("CrashTestDummy");
+        Command help = Command.create("help");
+        assertTrue(help.execute(robot));
+        assertEquals("I can understand these commands:\n" +
+                "OFF  - Shut down robot\n" +
+                "HELP - provide information about commands\n" +
+                "FORWARD - move forward by specified number of steps, e.g. 'FORWARD 10'", robot.getStatus());
+    }
+Shutdown command
+Code it yourself
+Just like we have done for the help and forward commands, implement the execute() method for the shutdown command.
+
+Update CommandTest to test the execution of the shutdown command.
+
+Update ShutdownCommand to implement the execution logic.
+
+Make sure all your tests pass before continuing.
+
+Simplify Robot
+Now we can greatly simplify the handleCommand method in Robot and see the effect of polymorphism in action. Robot only knows about the base class type Command, and just knows to call execute on it. It does not matter which specific subclass is called. If more commands are added later on, the code for Robot will stay the same.
+
+Robot.java
+public class Robot {
+    public boolean handleCommand(Command command) {
+        return command.execute(this);                                                                   
+    }
+All we need now is to call the execute method on the command being handled with a reference to this instance of Robot, which will in turn cause the code of the specific sub-class, e.g. ForwardCommand, to be invoked.
+You are now ready to add even more commands by just adding more sub-classes of Command. As your toy robot grows in complexity, you might want to extend it with more state (e.g. start using the direction for handling left and right turns), but all the logic for a specific command stays in the command sub-class.
+
+Code it yourself
+Remove all unnecessary duplicated code from Robot.
+
+Make sure all your tests pass.
+
+Reflection
+We used polymorphism and made Robot only work with Command objects. Robot did not care what kind of command object it received. All it needed to know was that it could execute the command.
+
+We also shifted responsibility from Robot to Command. This makes sense because is the robot should simply respond to commands, and it is the command that knows the specifics of what the robot should do.
+
+After polymorphism, this is what our domain model looks like
